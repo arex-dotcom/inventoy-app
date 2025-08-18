@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Inventory Management App</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f9f9f9;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    form, .search-bar, table {
+      max-width: 900px;
+      margin: auto;
+    }
+
+    input, select, button {
+      padding: 8px;
+      margin: 5px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+
+    input[type="date"] {
+      padding: 6px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background: white;
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: center;
+    }
+
+    th {
+      background: #0078d4;
+      color: white;
+    }
+
+    .actions button {
+      margin: 0 5px;
+      padding: 5px 10px;
+      background: #0078d4;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .actions button:hover {
+      background: #005fa3;
+    }
+
+    @media (max-width: 600px) {
+      table, form {
+        font-size: 0.9em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>📊 Inventory Management</h1>
+
+  <div class="search-bar">
+    <input type="text" id="search" placeholder="Search by name or category..." />
+  </div>
+
+  <form id="inventory-form">
+    <input type="date" id="date" required />
+    <input type="text" id="name" placeholder="Item Name" required />
+    <select id="category" required>
+      <option value="">Select Category</option>
+      <option value="Electronics">Electronics</option>
+      <option value="Clothing">Clothing</option>
+      <option value="Food">Food</option>
+      <option value="Office">Office</option>
+    </select>
+    <input type="number" id="purchasePrice" placeholder="Unit Purchase Price" required />
+    <input type="number" id="quantityPurchased" placeholder="Quantity Purchased" required />
+    <input type="number" id="salesPrice" placeholder="Unit Sales Price" required />
+    <input type="number" id="quantitySold" placeholder="Quantity Sold" required />
+    <button type="submit">Add Item</button>
+  </form>
+
+  <table id="inventory-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Name</th>
+        <th>Category</th>
+        <th>Purchase Cost</th>
+        <th>Sales Income</th>
+        <th>Quantity in Stock</th>
+        <th>Sales Profit</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    const form = document.getElementById('inventory-form');
+    const tableBody = document.querySelector('#inventory-table tbody');
+    const searchInput = document.getElementById('search');
+    let inventory = JSON.parse(localStorage.getItem('inventory')) || [];
+
+    function renderTable(filter = '') {
+      tableBody.innerHTML = '';
+      inventory
+        .filter(item =>
+          item.name.toLowerCase().includes(filter) ||
+          item.category.toLowerCase().includes(filter)
+        )
+        .forEach((item, index) => {
+          const purchaseCost = (item.purchasePrice * item.quantityPurchased).toFixed(2);
+          const salesIncome = (item.salesPrice * item.quantitySold).toFixed(2);
+          const quantityInStock = item.quantityPurchased - item.quantitySold;
+          const salesProfit = ((item.salesPrice - item.purchasePrice) * item.quantitySold).toFixed(2);
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${item.date}</td>
+            <td>${item.name}</td>
+            <td>${item.category}</td>
+            <td>$${purchaseCost}</td>
+            <td>$${salesIncome}</td>
+            <td>${quantityInStock}</td>
+            <td>$${salesProfit}</td>
+            <td class="actions">
+              <button onclick="handleEdit(${index})">Edit</button>
+              <button onclick="handleDelete(${index})">Delete</button>
+            </td>
+          `;
+          tableBody.appendChild(row);
+        });
+    }
+
+    let editIndex = null;
+
+function handleEdit(index) {
+  const item = inventory[index];
+  document.getElementById('date').value = item.date;
+  document.getElementById('name').value = item.name;
+  document.getElementById('category').value = item.category;
+  document.getElementById('purchasePrice').value = item.purchasePrice;
+  document.getElementById('quantityPurchased').value = item.quantityPurchased;
+  document.getElementById('salesPrice').value = item.salesPrice;
+  document.getElementById('quantitySold').value = item.quantitySold;
+
+  editIndex = index;
+}
+
+function handleDelete(index) {
+  inventory.splice(index, 1);
+  localStorage.setItem('inventory', JSON.stringify(inventory));
+  editIndex = null;
+  renderTable(searchInput.value.toLowerCase());
+}
+
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const item = {
+    date: document.getElementById('date').value,
+    name: document.getElementById('name').value,
+    category: document.getElementById('category').value,
+    purchasePrice: parseFloat(document.getElementById('purchasePrice').value),
+    quantityPurchased: parseInt(document.getElementById('quantityPurchased').value),
+    salesPrice: parseFloat(document.getElementById('salesPrice').value),
+    quantitySold: parseInt(document.getElementById('quantitySold').value)
+  };
+
+  if (editIndex !== null) {
+    inventory[editIndex] = item; // Update existing item
+    editIndex = null; // Reset after editing
+  } else {
+    inventory.push(item); // Add new item
+  }
+
+  localStorage.setItem('inventory', JSON.stringify(inventory));
+  form.reset();
+  renderTable(searchInput.value.toLowerCase());
+});
+
+    renderTable();
+  </script>
+</body>
+</html>
