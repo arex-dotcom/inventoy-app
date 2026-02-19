@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Accounting Cycler</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      background: #f4f6f8;
+      color: #333;
+    }
+   header{
+    background: #2b7a78;
+    color: white;
+    padding: 1rem;
+    text-align: center;
+   }
+   nav{
+   display: flex;
+   justify-content: center;
+    gap: 1rem;
+    background: #def2f1;
+    padding: 0.5rem;
+   }
+   button{
+    padding: 0.5rem 1rem;
+    border: none;
+    background: #3aafa9;
+    color: white;
+    cursor: pointer;
+   }
+   button:hover{
+    background: #2b7a78;
+   }
+    main {
+      padding: 2rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 0.5rem;
+      text-align: left;
+    }
+    form {
+      margin-bottom: 1rem;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.5rem;
+    }
+    input {
+      padding: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+ <header><h1>book keeper</h1>
+ </header>
+  <nav>
+    <button onclick="showSection ('journal')">journal</button>
+    <button onclick="showSection ('ledger')">ledger</button>
+    <button onclick="showSection ('trialBalance')">trial balance</button>
+    <button onclick="showSection ('incomeStatement')">income statement</button>
+    <button onclick="showSection ('balanceSheet')">balance sheet</button>
+    <button onclick="showSection ('reports')">reports</button>
+    <button onclick="showSection ('budgeting')">budgeting</button>
+  </nav>
+
+  <main id="main-content"></main>
+
+  <script>
+    let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+    function saveTransactions() {
+      localStorage.setItem('transactions', JSON.stringify(transactions));
+    }
+function calculateNetIncome() {
+  let revenue = 0;
+  let expenses = 0;
+
+  transactions.forEach(tx => {
+    const acc = tx.account.toLowerCase();
+    if (acc.includes('revenue') || acc.includes('sales')) {
+      revenue += tx.credit;
+    }
+    if (acc.includes('expense') || acc.includes('cost')) {
+      expenses += tx.debit;
+    }
+  });
+
+  return {
+    revenue: revenue,
+    expenses: expenses,
+    netIncome: revenue - expenses
+  };
+}
+
+function calculateBalanceSheet() {
+  let assets = 0;
+  let liabilities = 0; 
+  let equity = 0;
+
+  transactions.forEach(tx => {
+    const acc = tx.account.toLowerCase();
+
+    if (acc.includes('cash') || acc.includes('receivable') || acc.includes('equipment') || acc.includes('supplies') ||acc.includes('asset') ||acc.includes('inventory')) {
+      assets += tx.debit - tx.credit;
+    }
+    if (acc.includes('payable') || acc.includes('loan') || acc.includes('liability')|| acc.includes('bank account')) {
+      liabilities += tx.credit - tx.debit;
+    }
+    if (acc.includes('equity') || acc.includes('capital') ||acc.includes('stock') || acc.includes('dividend') || acc.includes('investment') || acc.includes('drawing')) {
+      equity += tx.credit - tx.debit;
+    }
+    if (acc.includes('expense') || acc.includes('rent expense')|| acc.includes('advance rent expense') || acc.includes('advertise expense') || acc.includes('utilities expense') || acc.includes('salary expense') || acc.includes('fees expense') ) {
+      equity -= tx.debit;
+    }
+    if (acc.includes('revenue') || acc.includes('service') ) {
+      equity += tx.credit;
+    }
+  });
+
+  return {
+    assets,
+    liabilities,
+    equity,
+    isBalanced: assets === liabilities + equity,
+    difference: assets - (liabilities + equity)
+  };
+}
+function calculateBudgetStatus() {
+  const actuals = {};
+
+  transactions.forEach(tx => {
+    const acc = tx.account.toLowerCase();
+    budgets.forEach(b => {
+      if (acc.includes(b.category.toLowerCase())) {
+        actuals[b.category] = (actuals[b.category] || 0) + tx.debit;
+      }
+    });
+  });
+
+  return budgets.map(b => {
+    const actual = actuals[b.category] || 0;
+    return {
+      category: b.category,
+      budgeted: b.budgeted,
+      actual,
+      status: actual <= b.budgeted ? '✅ Under Budget' : '❌ Over Budget',
+      difference: b.budgeted - actual
+    };
+  });
+}
+   function showSection(section) {
+  const main = document.getElementById('main-content');
+  main.innerHTML = '';
+
+  switch (section) {
+
+    case 'journal':
+      renderjournal(main);
+      break;
+    case 'ledger':
+      renderLedger(main);
+      break;
+    case 'trialBalance':
+      renderTrialBalance(main);
+      break;
+    case 'incomeStatement':
+      renderIncomeStatement(main);
+      break;
+    case 'balanceSheet':
+      renderBalanceSheet(main);
+      break;
+    case 'reports':
+      renderReports(main); 
+      break;
+      case 'budgeting':
+      renderBudgeting(main);
+      break;
+    
+  }
+}
+function renderjournal(container) {
+  let html = `<h2>Journal Entries</h2>
+    <form onsubmit="addTransaction(event)">
+      <input type="date" id="date" required />
+      <input type="text" id="account" placeholder="Account" required />
+      <input type="number" id="debit" placeholder="Debit" />
+      <input type="number" id="credit" placeholder="Credit" />
+      <button type="submit">Add</button>
+    </form>
+    <input type="text" id="searchInput" placeholder="Search by date or account..." oninput="filterJournal()" style="margin-bottom:1rem; padding:0.5rem; width:20%;" />
+    <table>
+      <thead>
+        <tr><th>Date</th> <th>Description</th>
+<th>Account</th><th>Debit</th><th>Credit</th><th>Actions</th></tr>
+      </thead>
+      <tbody id="journalBody">`;
+
+  transactions.forEach((tx, index) => {
+    html += `<tr>
+      <td>${tx.date}</td>
+      
+      <td>${tx.account}</td>
+      <td>${tx.debit || ''}</td>
+      <td>${tx.credit || ''}</td>
+      <td>
+        <button onclick="editTransaction(${index})">Edit</button>
+        <button onclick="deleteTransaction(${index})">Delete</button>
+      </td>
+    </tr>`;
+  });
+
+ html += `
+    </tbody>
+  </table>
+  <div style="margin-top:1rem;">
+    <button onclick="exportJournalToPDF()" style="padding:0.5rem 1rem; margin-right:1rem;">📄 Export PDF</button>
+    <button onclick="enableJournalEditMode()" style="padding:0.5rem 1rem;">✏️ Edit Mode</button>
+  </div>`;
+  container.innerHTML = html;
+}
+function enableJournalEditMode() {
+  alert("Edit mode activated. You can now click 'Edit' next to any entry.");
+  // You can expand this to highlight rows, enable inline editing, etc.
+}
+function exportJournalToPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  doc.setFontSize(16);
+  doc.text("Journal Entries", 14, 20);
+
+  let y = 30;
+  doc.setFontSize(10);
+  doc.text("Date", 14, y);
+  doc.text("Account", 40, y);
+  doc.text("Debit", 100, y);
+  doc.text("Credit", 130, y);
+
+  y += 6;
+
+  transactions.forEach(tx => {
+    doc.text(tx.date, 14, y);
+    doc.text(tx.account, 40, y);
+    doc.text(String(tx.debit || ''), 100, y);
+    doc.text(String(tx.credit || ''), 130, y);
+    y += 6;
+    if (y > 280) {
+      doc.addPage();
+      y = 20;
+    }
+  });
+
+  doc.save("Journal_Entries.pdf");
+}
+  function editTransaction(index) {
+  const tx = transactions[index];
+  document.getElementById('date').value = tx.date;
+  document.getElementById('account').value = tx.account;
+  document.getElementById('debit').value = tx.debit;
+  document.getElementById('credit').value = tx.credit;
+
+  // Replace addTransaction with updateTransaction
+  const form = document.querySelector('form');
+  form.onsubmit = function (e) {
+    e.preventDefault();
+    transactions[index] = {
+      date: document.getElementById('date').value,
+      account: document.getElementById('account').value,
+      debit: parseFloat(document.getElementById('debit').value) || 0,
+      credit: parseFloat(document.getElementById('credit').value) || 0
+    };
+    saveTransactions();
+    form.onsubmit = addTransaction; // Reset to original
+    form.reset();
+    showSection('journal');
+  };
+}
+function deleteTransaction(index) {
+  if (confirm('Are you sure you want to delete this transaction?')) {
+    transactions.splice(index, 1);
+    saveTransactions();
+    showSection('journal');
+  }
+}
+
+function addTransaction(event) {
+  event.preventDefault();
+
+  const date = document.getElementById('date').value;
+  const account = document.getElementById('account').value.trim();
+  const debit = parseFloat(document.getElementById('debit').value) || 0;
+  const credit = parseFloat(document.getElementById('credit').value) || 0;
+
+  // 🚫 Prevent same account from being debited and credited
+  if (debit > 0 && credit > 0) {
+    alert("You cannot debit and credit the same account in one transaction.");
+    return;
+  }
+ if (!date || !account || (debit === 0 && credit === 0)) {
+    alert("Please fill out all required fields.");
+    return;
+  }
+
+
+  transactions.push({ date, account, debit, credit });
+  saveTransactions();
+    // Clear form inputs
+  document.getElementById('date').value = '';
+  document.getElementById('account').value = '';
+  document.getElementById('debit').value = '';
+  document.getElementById('credit').value = '';
+
+  // Re-render journal
+  renderJournal(document.getElementById('main-content'));
+}
+
+
+  // 🧠 Auto-balance logic
+  document.addEventListener('DOMContentLoaded', () => {
+    const debitInput = document.getElementById('debit');
+    const creditInput = document.getElementById('credit');
+
+    debitInput.addEventListener('input', () => {
+      if (!creditInput.value) {
+        creditInput.value = debitInput.value;
+      }
+    });
+
+    creditInput.addEventListener('input', () => {
+      if (!debitInput.value) {
+        debitInput.value = creditInput.value;
+      }
+    });
+  });
+
+  // Load Journal by default
+  showSection('journal');
+
+function addBudget(event) {
+  event.preventDefault();
+
+  const categoryInput = document.getElementById('budgetCategory');
+  const amountInput = document.getElementById('budgetAmount');
+
+  const category = categoryInput.value.trim();
+  const amount = parseFloat(amountInput.value);
+
+  if (!category || isNaN(amount) || amount < 0) {
+    alert("Please enter a valid category and amount.");
+    return;
+  }
+
+  const existing = budgets.find(b => b.category.toLowerCase() === category.toLowerCase());
+  if (existing) {
+    existing.budgeted += amount;
+  } else {
+    budgets.push({ category, budgeted: amount });
+  }
+
+  categoryInput.value = '';
+  amountInput.value = '';
+
+  renderBudgeting(document.getElementById('main-content'));
+}
+function exportBudgetToPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const results = calculateBudgetStatus();
+
+  doc.setFontSize(16);
+  doc.text("Budget Overview", 14, 20);
+
+  let y = 30;
+  doc.setFontSize(10);
+  doc.text("Category", 14, y);
+  doc.text("Budgeted", 60, y);
+  doc.text("Actual", 100, y);
+  doc.text("Status", 140, y);
+
+  y += 6;
+
+  results.forEach(r => {
+    doc.text(r.category, 14, y);
+    doc.text(String(r.budgeted.toFixed(2)), 60, y);
+    doc.text(String(r.actual.toFixed(2)), 100, y);
+    doc.text(r.status, 140, y);
+    y += 6;
+    if (y > 280) {
+      doc.addPage();
+      y = 20;
+    }
+  });
+
+  doc.save("Budget_Report.pdf");
+}
+  let ledger = {}; // Declare globally
+
+function renderLedger(container, searchTerm = '') {
+  ledger = {}; // Reset and rebuild inside the function
+  transactions.forEach(tx => {
+    if (!ledger[tx.account]) ledger[tx.account] = [];
+    ledger[tx.account].push(tx);
+  });
+
+  let html = `
+    <h2>Ledger</h2>
+    <input type="text" id="ledgerSearch" placeholder="Search account..." />
+    <button id="exportPdfBtn">Export to PDF</button>
+  `;
+
+  for (const account in ledger) {
+    if (searchTerm && !account.toLowerCase().includes(searchTerm.toLowerCase())) continue;
+
+    let totalDebit = 0;
+    let totalCredit = 0;
+
+    html += `<h3>${account}</h3><table><thead><tr><th>Date</th><th>Debit</th><th>Credit</th></tr></thead><tbody>`;
+    ledger[account].forEach(tx => {
+      totalDebit += tx.debit || 0;
+      totalCredit += tx.credit || 0;
+
+      html += `<tr>
+        <td>${tx.date}</td>
+        <td>${tx.debit || ''}</td>
+        <td>${tx.credit || ''}</td>
+      </tr>`;
+    });
+
+    const balance = totalDebit - totalCredit;
+    const balanceLabel = balance >= 0 ? 'Debit Balance' : 'Credit Balance';
+
+    html += `</tbody></table>
+      <p><strong>Total Debit:</strong> ${totalDebit.toFixed(2)}<br>
+      <strong>Total Credit:</strong> ${totalCredit.toFixed(2)}<br>
+      <strong>${balanceLabel}:</strong> ${Math.abs(balance).toFixed(2)}</p>`;
+  }
+
+  container.innerHTML = html;
+
+  const searchInput = document.getElementById('ledgerSearch');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      renderLedger(container, e.target.value);
+    });
+  }
+
+  const exportBtn = document.getElementById('exportPdfBtn');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', () => {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      let y = 10;
+      doc.setFontSize(16);
+      doc.text('Ledger Report', 10, y);
+      y += 10;
+
+      for (const account in ledger) {
+        doc.setFontSize(14);
+        doc.text(`Account: ${account}`, 10, y);
+        y += 8;
+
+        doc.setFontSize(12);
+        doc.text('Date       Debit       Credit', 10, y);
+        y += 6;
+
+        ledger[account].forEach(tx => {
+          const line = `${tx.date}    ${tx.debit || ''}       ${tx.credit || ''}`;
+          doc.text(line, 10, y);
+          y += 6;
+        });
+
+        const totalDebit = ledger[account].reduce((sum, tx) => sum + (tx.debit || 0), 0);
+        const totalCredit = ledger[account].reduce((sum, tx) => sum + (tx.credit || 0), 0);
+        const balance = totalDebit - totalCredit;
+        const balanceLabel = balance >= 0 ? 'Debit Balance' : 'Credit Balance';
+
+        doc.text(`Total Debit: ${totalDebit.toFixed(2)}`, 10, y);
+        y += 6;
+        doc.text(`Total Credit: ${totalCredit.toFixed(2)}`, 10, y);
+        y += 6;
+        doc.text(`${balanceLabel}: ${Math.abs(balance).toFixed(2)}`, 10, y);
+        y += 10;
+      }
+
+      doc.save('ledger.pdf');
+    });
+  }
+}
+function renderTrialBalance(container) {
+  const balances = {};
+  transactions.forEach(tx => {
+    if (!balances[tx.account]) balances[tx.account] = { debit: 0, credit: 0 };
+    balances[tx.account].debit += tx.debit;
+    balances[tx.account].credit += tx.credit;
+  });
+
+  let totalDebit = 0;
+  let totalCredit = 0;
+
+  let html = `<h2>Trial Balance</h2>
+    <table>
+      <thead>
+        <tr><th>Account</th><th>Debit</th><th>Credit</th></tr>
+      </thead>
+      <tbody>`;
+
+  for (const account in balances) {
+    const { debit, credit } = balances[account];
+    totalDebit += debit;
+    totalCredit += credit;
+    html += `<tr><td>${account}</td><td>${debit}</td><td>${credit}</td></tr>`;
+  }
+
+  html += `
+    <tr><th>Total</th><th>${totalDebit}</th><th>${totalCredit}</th></tr>
+    </tbody>
+    </table>
+    <div style="margin-top:1rem;">
+      <button onclick="exportTrialBalanceToPDF()" style="padding:0.5rem 1rem;">📄 Export PDF</button>
+    </div>`;
+
+  container.innerHTML = html;
+}
+ function renderIncomeStatement(container) {
+  const { revenue, expenses, netIncome } = calculateNetIncome();
+
+  const html = `
+    <h2>Income Statement</h2>
+    <table>
+      <tr><td>Revenue</td><td>${revenue.toFixed(2)}</td></tr>
+      <tr><td>Expenses</td><td>${expenses.toFixed(2)}</td></tr>
+      <tr><th>Net Income</th><th>${netIncome.toFixed(2)}</th></tr>
+    </table>
+    <div style="margin-top:1rem;">
+      <button onclick="exportIncomeStatementToPDF()" style="padding:0.5rem 1rem;">📄 Export PDF</button>
+    </div>
+  `;
+
+  container.innerHTML = html;
+}
+
+function renderBalanceSheet(container) {
+  const { assets, liabilities, equity, isBalanced, difference } = calculateBalanceSheet();
+
+  const html = `
+    <h2>Balance Sheet</h2>
+    <table>
+      <tr><td>Assets</td><td>${assets.toFixed(2)}</td></tr>
+      <tr><td>Liabilities</td><td>${liabilities.toFixed(2)}</td></tr>
+      <tr><td>Equity</td><td>${equity.toFixed(2)}</td></tr>
+      <tr><th>Liabilities + Equity</th><th>${(liabilities + equity).toFixed(2)}</th></tr>
+      <tr style="background:${isBalanced ? '#d4edda' : '#f8d7da'};">
+        <th>Status</th>
+        <th>${isBalanced ? '✅ Balanced' : `❌ Imbalance of ${difference.toFixed(2)}`}</th>
+      </tr>
+    </table>
+    <div style="margin-top:1rem;">
+      <button onclick="exportBalanceSheetToPDF()" style="padding:0.5rem 1rem;">📄 Export PDF</button>
+    </div>
+  `;
+  function exportBalanceSheetToPDF() {
+  const doc = new jsPDF();
+  const { assets, liabilities, equity, isBalanced, difference } = calculateBalanceSheet();
+
+  doc.setFontSize(16);
+  doc.text("Balance Sheet", 14, 20);
+
+  doc.setFontSize(12);
+  doc.text(`Assets: ${assets.toFixed(2)}`, 14, 40);
+  doc.text(`Liabilities: ${liabilities.toFixed(2)}`, 14, 50);
+  doc.text(`Equity: ${equity.toFixed(2)}`, 14, 60);
+  doc.text(`Liabilities + Equity: ${(liabilities + equity).toFixed(2)}`, 14, 70);
+
+  doc.setFont(undefined, 'bold');
+  const statusText = isBalanced
+    ? "✅ Balanced"
+    : `❌ Imbalance of ${difference.toFixed(2)}`;
+  doc.text(`Status: ${statusText}`, 14, 85);
+
+  doc.save("Balance_Sheet.pdf");
+}
+  container.innerHTML = html;
+}
+
+
+function renderReports(container) {
+  let revenue = 0;
+  let expenses = 0;
+
+  transactions.forEach(tx => {
+    const acc = tx.account.toLowerCase();
+    if (acc.includes('sales') || acc.includes('revenue')) {
+      revenue += tx.credit;
+    }
+    if (acc.includes('expense') || acc.includes('cost')) {
+      expenses += tx.debit;
+    }
+  });
+
+  const netIncome = revenue - expenses;
+  const status = netIncome >= 0 ? 'Profit' : 'Loss';
+
+  const html = `
+    <h2>Financial Report</h2>
+    <table>
+      <tr><td>Total Revenue</td><td>${revenue.toFixed(2)}</td></tr>
+      <tr><td>Total Expenses</td><td>${expenses.toFixed(2)}</td></tr>
+      <tr><th>Net ${status}</th><th>${netIncome.toFixed(2)}</th></tr>
+    </table>
+    <div style="margin-top:1rem;">
+      <button onclick="exportFinancialReportToPDF()" style="padding:0.5rem 1rem;">📄 Export PDF</button>
+    </div>
+  `;
+  function exportFinancialReportToPDF() {
+  const doc = new jsPDF();
+
+  let revenue = 0;
+  let expenses = 0;
+
+  transactions.forEach(tx => {
+    const acc = tx.account.toLowerCase();
+    if (acc.includes('sales') || acc.includes('revenue')) {
+      revenue += tx.credit;
+    }
+    if (acc.includes('expense') || acc.includes('cost')) {
+      expenses += tx.debit;
+    }
+  });
+
+  const netIncome = revenue - expenses;
+  const status = netIncome >= 0 ? 'Profit' : 'Loss';
+
+  doc.setFontSize(16);
+  doc.text("Financial Report", 14, 20);
+
+  doc.setFontSize(12);
+  doc.text(`Total Revenue: ${revenue.toFixed(2)}`, 14, 40);
+  doc.text(`Total Expenses: ${expenses.toFixed(2)}`, 14, 50);
+
+  doc.setFont(undefined, 'bold');
+  doc.text(`Net ${status}: ${netIncome.toFixed(2)}`, 14, 65);
+
+  doc.save("Financial_Report.pdf");
+}
+  container.innerHTML = html;
+}
+
+// Budgeting
+
+function calculateBudgetStatus() {
+  const actuals = {};
+  transactions.forEach(tx => {
+    const acc = tx.account.toLowerCase();
+    budgets.forEach(b => {
+      if (acc.includes(b.category.toLowerCase())) {
+        actuals[b.category] = (actuals[b.category] || 0) + tx.debit;
+      }
+    });
+  });
+
+  return budgets.map(b => {
+    const actual = actuals[b.category] || 0;
+    return {
+      category: b.category,
+      budgeted: b.budgeted,
+      actual,
+      status: actual <= b.budgeted ? '✅ Under Budget' : '❌ Over Budget',
+      difference: b.budgeted - actual
+    };
+  });
+}
+
+function renderBudgeting(container) {
+  const budgetStatus = calculateBudgetStatus();
+  let html = `<h2>Budgeting</h2>
+  <form onsubmit="addBudget(event)" style="margin-bottom:1rem;">
+  <input type="text" id="budgetCategory" placeholder="Category" required />
+  <input type="number" id="budgetAmount" placeholder="Budgeted Amount" required />
+  <button type="submit">Add Budget</button>
+</form>
+    <table>
+      <thead>
+        <tr><th>Category</th><th>Budgeted</th><th>Actual</th><th>Status</th><th>Difference</th><th>Actions</th></tr>
+      </thead>
+      <tbody>`;
+
+  budgetStatus.forEach(b => {
+    html += `<tr>
+      <td>${b.category}</td>
+      <td>${b.budgeted.toFixed(2)}</td>
+      <td>${b.actual.toFixed(2)}</td>
+      <td>${b.status}</td>
+      <td>${b.difference.toFixed(2)}</td>
+  >
+   
+    </tr>`;
+  });
+
+  html += `</tbody>
+  </table>
+  <button onclick="exportBudgetingReportToPDF()" style="margin-top:1rem;">📄 Export PDF</button>`;
+  container.innerHTML = html;
+}
+
+// Add missing exportBudgetingReportToPDF function
+function exportBudgetingReportToPDF() {
+  const doc = new jsPDF();
+  const budgetStatus = calculateBudgetStatus();
+
+  doc.setFontSize(16);
+  doc.text("Budgeting Report", 14, 20);
+
+  let y = 30;
+  doc.setFontSize(10);
+  doc.text("Category", 14, y);
+  doc.text("Budgeted", 60, y);
+  doc.text("Actual", 100, y);
+  doc.text("Status", 140, y);
+  doc.text("Difference", 170, y);
+
+  y += 6;
+
+  budgetStatus.forEach(b => {
+    doc.text(b.category, 14, y);
+    doc.text(String(b.budgeted.toFixed(2)), 60, y);
+    doc.text(String(b.actual.toFixed(2)), 100, y);
+    doc.text(b.status, 140, y);
+    doc.text(String(b.difference.toFixed(2)), 170, y);
+    y += 6;
+    if (y > 280) {
+      doc.addPage();
+      y = 20;
+    }
+  });
+
+  doc.save("Budgeting_Report.pdf");
+}
+
+// Add missing exportTrialBalanceToPDF function
+function exportTrialBalanceToPDF() {
+  const doc = new jsPDF();
+  const balances = {};
+  transactions.forEach(tx => {
+    if (!balances[tx.account]) balances[tx.account] = { debit: 0, credit: 0 };
+    balances[tx.account].debit += tx.debit;
+    balances[tx.account].credit += tx.credit;
+  });
+
+  doc.setFontSize(16);
+  doc.text("Trial Balance", 14, 20);
+
+  let y = 30;
+  doc.setFontSize(10);
+  doc.text("Account", 14, y);
+  doc.text("Debit", 60, y);
+  doc.text("Credit", 100, y);
+  y += 6;
+
+  let totalDebit = 0;
+  let totalCredit = 0;
+  for (const account in balances) {
+    const { debit, credit } = balances[account];
+    doc.text(account, 14, y);
+    doc.text(String(debit), 60, y);
+    doc.text(String(credit), 100, y);
+    totalDebit += debit;
+    totalCredit += credit;
+    y += 6;
+    if (y > 280) {
+      doc.addPage();
+      y = 20;
+    }
+  }
+  doc.text("Total", 14, y);
+  doc.text(String(totalDebit), 60, y);
+  doc.text(String(totalCredit), 100, y);
+
+  doc.save("Trial_Balance.pdf");
+}
+
+// Add missing exportIncomeStatementToPDF function
+function exportIncomeStatementToPDF() {
+  const doc = new jsPDF();
+  const { revenue, expenses, netIncome } = calculateNetIncome();
+
+  doc.setFontSize(16);
+  doc.text("Income Statement", 14, 20);
+
+  doc.setFontSize(12);
+  doc.text(`Revenue: ${revenue.toFixed(2)}`, 14, 40);
+  doc.text(`Expenses: ${expenses.toFixed(2)}`, 14, 50);
+  doc.text(`Net Income: ${netIncome.toFixed(2)}`, 14, 60);
+
+  doc.save("Income_Statement.pdf");
+}
+
+const budgets = [ { category: 'office equipment', budgeted: 0 }, { category: 'rent', budgeted: 0 }, { category: 'stationery', budgeted: 0 }, { category: 'salary', budgeted: 0 }, { category: 'wages', budgeted: 0 }, { category: 'advertise', budgeted: 0 }, { category: 'utilities', budgeted: 0 }, { category: 'fees', budgeted: 0 }  
+];
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</body>
+</html>
